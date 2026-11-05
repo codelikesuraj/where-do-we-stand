@@ -23,7 +23,7 @@ img{max-width:100%}
   --a:#7aa9e6; --b:#5cc2a4; --c:#e0a75a; --d:#e57b80; --agree:#5cc2a4; --split:#e0a75a; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.6}
-.wrap{max-width:none;margin:0;padding-block:20px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+.wrap{max-width:1100px;margin:0 auto;padding-block:24px 64px;padding-left:max(clamp(20px,5vw,48px),env(safe-area-inset-left,0px));padding-right:max(clamp(20px,5vw,48px),env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,6vw,40px);line-height:1.05;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);font-size:14px;margin:4px 0 0}
