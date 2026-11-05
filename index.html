@@ -123,7 +123,8 @@ function renderScenario(){
 }
 function updateSubmitUI(){
   const lk=locked();
-  $("submitOpen").hidden=lk;
+  $("submitOpen").hidden=lk||missingList().length>0;
+  if($("submitOpen").hidden)$("confirm").hidden=true;
   $("next").hidden=st.cur===Q.length-1;
   if(lk){
     $("confirm").hidden=true;$("missing").hidden=true;
