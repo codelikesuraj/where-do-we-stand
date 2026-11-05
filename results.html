@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Where Do We Stand Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Literata:opsz,wght@7..72,400;7..72,500&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Where Do We Stand: Results</h1>
+      <p class="sub" id="summary">Loading answers…</p>
+    </div>
+    <button class="btn" id="refresh">Refresh</button>
+  </header>
+
+  <div class="banner warn" id="error" hidden></div>
+
+  <section id="view-compare" style="display:flex;flex-direction:column;gap:18px">
+    <div class="people" id="people"></div>
+    <div class="pairs" id="pairs"></div>
+    <div class="filter" id="filter">
+      <button data-f="all" aria-pressed="true">All</button>
+      <button data-f="split" aria-pressed="false">Disagree</button>
+      <button data-f="agree" aria-pressed="false">Agree</button>
+    </div>
+    <div class="rows" id="rows"></div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script src="questions.js"></script>
+<script>
+(function(){
+const Q=window.QUESTIONS, LETTERS=["A","B","C","D"];
+const COLORS=["var(--a)","var(--d)","var(--c)","var(--b)"];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const key=new URLSearchParams(location.search).get("key")||"";
+
+let people=[], shown=new Set(), filter="all";
+
+function err(t){$("error").textContent=t;$("error").hidden=!t}
+
+async function load(){
+  if(!key){err("This page needs the results key in its link (results.html?key=…). Use the link from your setup.");$("summary").textContent="";return}
+  $("refresh").disabled=true;
+  try{
+    const res=await fetch(window.API_URL+"?key="+encodeURIComponent(key));
+    const out=await res.json();
+    if(!out.ok){err(out.error==="unauthorized"?"This results link isn't valid. Check the key at the end of the link.":"Couldn't load results.");return}
+    err("");
+    const seen={};
+    const prev=new Set(people.map(p=>p.id));
+    people=out.rows.map((r,i)=>{
+      const base=r.name||"Someone";seen[base]=(seen[base]||0)+1;
+      return {id:i+":"+r.submittedAt,name:seen[base]>1?`${base} (${seen[base]})`:base,answers:r.answers||{},submittedAt:r.submittedAt};
+    });
+    people.forEach(p=>{if(!prev.has(p.id))shown.add(p.id)});
+    const n=people.length;
+    $("summary").textContent=`${n} ${n===1?"person has":"people have"} submitted answers to 25 marriage and family scenarios. Updated ${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}.`;
+    render();
+  }catch(e){err("Couldn't reach the results. Check your connection and press Refresh.")}
+  finally{$("refresh").disabled=false}
+}
+
+function render(){
+  $("people").innerHTML=people.map((p,i)=>`<button class="chip" data-id="${esc(p.id)}" aria-pressed="${shown.has(p.id)}"><span class="dot" style="background:${COLORS[i%4]}"></span>${esc(p.name)}</button>`).join("");
+  $("people").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{const id=c.dataset.id;shown.has(id)?shown.delete(id):shown.add(id);render()});
+  const vis=people.filter(p=>shown.has(p.id));
+
+  const pairs=[];
+  for(let i=0;i<vis.length;i++)for(let j=i+1;j<vis.length;j++){
+    let same=0;Q.forEach(q=>{if(vis[i].answers[q.n]&&vis[i].answers[q.n]===vis[j].answers[q.n])same++});
+    pairs.push({a:vis[i].name,b:vis[j].name,same});
+  }
+  pairs.sort((x,y)=>y.same-x.same);
+  $("pairs").innerHTML=pairs.map(p=>{const pct=Math.round(p.same/Q.length*100);
+    return `<div class="pair"><div class="names">${esc(p.a)} &amp; ${esc(p.b)}</div><div class="pct">${pct}%</div>
+    <div class="bar"><i style="width:${pct}%"></i></div><div class="names">Same pick on ${p.same} of ${Q.length} scenarios</div></div>`}).join("");
+
+  if(vis.length<2){
+    $("rows").innerHTML=`<div class="empty">${people.length<2?"The comparison appears once at least two people have submitted.":"Select at least two people above to compare."}</div>`;
+    return;
+  }
+  const openSet=new Set([...document.querySelectorAll("details.row[open]")].map(d=>d.dataset.n));
+  const rows=Q.map(q=>{
+    const picks=vis.map(p=>({name:p.name,v:p.answers[q.n]})).filter(p=>p.v);
+    const kind=picks.length<2?"wait":new Set(picks.map(p=>p.v)).size===1?"agree":"split";
+    return {q,picks,kind};
+  }).filter(r=>filter==="all"||r.kind===filter);
+
+  $("rows").innerHTML=rows.length?rows.map(({q,picks,kind})=>{
+    const tag=kind==="agree"?"Agree":kind==="split"?"Disagree":"—";
+    const chips=picks.map(p=>`<span class="pick"><span class="l ${p.v}">${p.v}</span>${esc(p.name)}</span>`).join("");
+    const opts=LETTERS.map(L=>{const who=picks.filter(p=>p.v===L).map(p=>p.name);
+      return `<div class="o"><span class="l ${L}">${L}</span><span>${esc(q.options[L])}${who.length?`<small>${esc(who.join(", "))}</small>`:""}</span></div>`}).join("");
+    return `<details class="row ${kind}" data-n="${q.n}"${openSet.has(String(q.n))?" open":""}><summary>
+      <div class="rowhead"><b>${q.n}. ${esc(q.title)}</b><span class="tag ${kind}">${tag}</span></div>
+      <div class="picks">${chips}</div></summary>
+      <div class="detail"><p class="legend">${esc(q.prompt)}</p>${opts}</div></details>`}).join("")
+    :`<div class="empty">No scenarios match this filter.</div>`;
+}
+
+$("filter").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  filter=b.dataset.f;$("filter").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
+$("refresh").onclick=load;
+load();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Where Do We Stand</title>
+<meta name="description" content="25 marriage and family scenarios. Pick what you'd do.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Literata:opsz,wght@7..72,400;7..72,500&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Where Do We Stand</h1>
+      <p class="sub">25 marriage and family scenarios. Pick what you'd do in each one.</p>
+    </div>
+    <div class="who" id="who"></div>
+  </header>
+
+  <form class="gate" id="gate" hidden>
+    <div class="eyebrow">Before you start</div>
+    <h2>What should we call you?</h2>
+    <p class="sub">Your name is saved with your answers. You can change it until you submit.</p>
+    <div class="gaterow">
+      <input id="nameInput" type="text" maxlength="40" autocomplete="name" placeholder="Your name" required>
+      <button class="btn primary" type="submit">Start</button>
+    </div>
+    <p class="status" id="gateMsg"></p>
+  </form>
+
+  <section id="view-answer" hidden style="flex-direction:column;gap:16px">
+    <div class="progress"><span id="saveStatus" class="status"></span></div>
+    <div class="strip" id="strip"></div>
+    <article class="scenario" id="scenario"></article>
+    <div class="nav">
+      <button class="btn" id="prev">Previous</button>
+      <button class="btn" id="submitOpen">Submit answers</button>
+      <button class="btn primary" id="next">Next</button>
+    </div>
+    <div class="banner warn" id="missing" hidden></div>
+    <div class="confirm" id="confirm" hidden>
+      <h3>Submit your answers?</h3>
+      <p>You've answered all 25 scenarios. Once you submit, your answers are final and can't be changed.</p>
+      <div class="confirmrow"><button class="btn primary" id="submitYes">Submit answers</button><button class="btn" id="submitNo">Keep reviewing</button></div>
+    </div>
+    <div class="banner" id="done" hidden></div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script src="questions.js"></script>
+<script>
+(function(){
+const Q=window.QUESTIONS, LETTERS=["A","B","C","D"], KEY="wdws-v1";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let st={name:"",answers:{},cur:0,submittedAt:null,clientId:null};
+try{Object.assign(st,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
+if(!st.clientId)st.clientId=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+if(!(st.cur>=0&&st.cur<Q.length))st.cur=0;
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+persist();
+
+const locked=()=>!!st.submittedAt;
+const missingList=()=>Q.filter(q=>!st.answers[q.n]);
+let showMissing=false;
+
+/* Name gate */
+function showGate(on){
+  $("gate").hidden=!on;
+  const v=$("view-answer");v.hidden=on;v.style.display=on?"none":"flex";
+  if(on){$("nameInput").value=st.name;setTimeout(()=>$("nameInput").focus(),0)}
+  renderWho();
+}
+function renderWho(){
+  const w=$("who");w.innerHTML="";
+  if(!st.name||!$("gate").hidden)return;
+  w.innerHTML=`<span class="dot" style="background:var(--accent)"></span><span>${locked()?"Submitted as":"Answering as"} <b>${esc(st.name)}</b></span>`+(locked()?"":` · <button class="linkbtn" id="rename">Change name</button>`);
+  if(!locked())$("rename").onclick=()=>showGate(true);
+}
+$("gate").onsubmit=e=>{
+  e.preventDefault();
+  const v=$("nameInput").value.trim().replace(/\s+/g," ");
+  if(!v){$("gateMsg").textContent="Enter a name to continue.";return}
+  if(!locked())st.name=v;
+  $("gateMsg").textContent="";persist();showGate(false);
+};
+
+/* Answering */
+function renderStrip(){
+  const s=$("strip");s.innerHTML="";
+  Q.forEach((q,i)=>{
+    const b=document.createElement("button");
+    b.textContent=q.n;b.title=q.title;
+    if(st.answers[q.n])b.classList.add("done");
+    if(i===st.cur)b.classList.add("cur");
+    if(showMissing&&!locked()&&!st.answers[q.n])b.classList.add("missing");
+    b.onclick=()=>go(i);s.appendChild(b);
+  });
+}
+function renderScenario(){
+  const q=Q[st.cur],sel=st.answers[q.n],lk=locked();
+  $("scenario").innerHTML=`
+    <div><div class="eyebrow">Scenario ${q.n} of ${Q.length}</div><h2>${esc(q.title)}</h2></div>
+    <div class="story">${q.story.map(p=>`<p>${esc(p)}</p>`).join("")}</div>
+    <p class="prompt">${esc(q.prompt)}</p>
+    <div class="opts" role="radiogroup">${LETTERS.map(L=>`
+      <label class="opt${sel===L?" sel":""}${lk?" locked":""}"><input type="radio" name="q${q.n}" id="q${q.n}-${L}" value="${L}"${sel===L?" checked":""}${lk?" disabled":""}>
+      <span class="letter">${L}</span><span>${esc(q.options[L])}</span></label>`).join("")}</div>`;
+  $("scenario").querySelectorAll("input").forEach(inp=>inp.onchange=()=>{
+    if(locked())return;
+    st.answers[q.n]=inp.value;persist();
+    $("scenario").querySelectorAll(".opt").forEach(o=>o.classList.toggle("sel",o.querySelector("input").checked));
+    $("saveStatus").textContent="Progress saved on this device";
+    renderStrip();updateSubmitUI();
+  });
+  $("prev").disabled=st.cur===0;
+  updateSubmitUI();
+}
+function updateSubmitUI(){
+  const lk=locked();
+  $("submitOpen").hidden=lk;
+  $("next").hidden=st.cur===Q.length-1;
+  if(lk){
+    $("confirm").hidden=true;$("missing").hidden=true;
+    const d=new Date(st.submittedAt);
+    $("done").textContent=`Submitted${isNaN(d)?"":" on "+d.toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"})}. Your answers are final. Thank you.`;
+    $("done").hidden=false;$("saveStatus").textContent="";
+  }else{
+    $("done").hidden=true;
+    if(showMissing){const m=missingList();
+      $("missing").hidden=!m.length;
+      if(m.length)$("missing").textContent=`Every scenario needs an answer before you can submit. Still to answer: ${m.map(q=>q.n).join(", ")}. They're outlined in the strip above.`;}
+  }
+}
+function go(i){st.cur=i;persist();renderStrip();renderScenario();window.scrollTo({top:0,behavior:"smooth"})}
+$("prev").onclick=()=>st.cur>0&&go(st.cur-1);
+$("next").onclick=()=>st.cur<Q.length-1&&go(st.cur+1);
+
+/* Submitting */
+$("submitOpen").onclick=()=>{
+  if(locked())return;
+  showMissing=true;
+  if(missingList().length){$("confirm").hidden=true;renderStrip();updateSubmitUI();$("missing").scrollIntoView({behavior:"smooth",block:"center"});return}
+  $("missing").hidden=true;$("confirm").hidden=false;$("submitYes").focus();
+};
+$("submitNo").onclick=()=>{$("confirm").hidden=true};
+$("submitYes").onclick=async()=>{
+  if(missingList().length){$("confirm").hidden=true;$("submitOpen").click();return}
+  const btn=$("submitYes");btn.disabled=true;btn.textContent="Submitting…";
+  try{
+    const res=await fetch(window.API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({clientId:st.clientId,name:st.name,answers:st.answers})});
+    const out=await res.json();
+    if(!out.ok)throw new Error(out.error||"failed");
+    st.submittedAt=new Date().toISOString();persist();
+    renderStrip();renderScenario();renderWho();window.scrollTo({top:0,behavior:"smooth"});
+  }catch(e){
+    $("confirm").hidden=true;
+    $("missing").textContent="Your answers couldn't be submitted. Check your internet connection and press Submit again. Nothing has been lost.";
+    $("missing").hidden=false;
+  }finally{btn.disabled=false;btn.textContent="Submit answers"}
+};
+
+/* Boot */
+renderStrip();renderScenario();showGate(!st.name);
+})();
+</script>
+</body>
+</html>
