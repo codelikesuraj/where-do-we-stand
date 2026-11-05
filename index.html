@@ -102,11 +102,21 @@ function renderStrip(){
     b.onclick=()=>go(i);s.appendChild(b);
   });
 }
+/* Join the story's short lines into flowing paragraphs of a few sentences each */
+function paras(lines){
+  const out=[];let cur="";
+  lines.forEach(l=>{
+    cur=cur?cur+" "+l:l;
+    if(cur.length>=320){out.push(cur);cur=""}
+  });
+  if(cur){if(out.length&&cur.length<120)out[out.length-1]+=" "+cur;else out.push(cur)}
+  return out;
+}
 function renderScenario(){
   const q=Q[st.cur],sel=st.answers[q.n],lk=locked();
   $("scenario").innerHTML=`
     <div><div class="eyebrow">Scenario ${q.n} of ${Q.length}</div><h2>${esc(q.title)}</h2></div>
-    <div class="story">${q.story.map(p=>`<p>${esc(p)}</p>`).join("")}</div>
+    <div class="story">${paras(q.story).map(p=>`<p>${esc(p)}</p>`).join("")}</div>
     <p class="prompt">${esc(q.prompt)}</p>
     <div class="opts" role="radiogroup">${LETTERS.map(L=>`
       <label class="opt${sel===L?" sel":""}${lk?" locked":""}"><input type="radio" name="q${q.n}" id="q${q.n}-${L}" value="${L}"${sel===L?" checked":""}${lk?" disabled":""}>
