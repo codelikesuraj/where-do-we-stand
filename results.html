@@ -64,7 +64,7 @@ async function load(){
     });
     people.forEach(p=>{if(!prev.has(p.id))shown.add(p.id)});
     const n=people.length;
-    $("summary").textContent=`${n} ${n===1?"person has":"people have"} submitted answers to 25 marriage and family scenarios. Updated ${new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}.`;
+    $("summary").textContent=`${n} ${n===1?"person has":"people have"} submitted answers to 25 marriage and family scenarios.`;
     render();
   }catch(e){err("Couldn't reach the results. Check your connection and press Refresh.")}
   finally{$("refresh").disabled=false}
